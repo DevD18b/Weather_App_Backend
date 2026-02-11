@@ -12,15 +12,56 @@ exports.current = (data) => ({
     updatedAt: new Date(data.dt * 1000).toISOString()
   }
 });
+exports.forecast = (data) => {
+  const byDate = {};
 
-exports.forecast = (data) => ({
-  location: {
-    city: data.city.name,
-    country: data.city.country
-  },
-  forecast: data.list.slice(0, 5).map(item => ({
-    time: new Date(item.dt * 1000).toISOString(),
-    tempC: item.main.temp,
-    condition: item.weather[0].main
-  }))
-});
+  data.list.forEach(item => {
+    const dateObj = new Date(item.dt * 1000);
+
+    // Real date key (not weekday)
+    const dateKey = dateObj.toISOString().split("T")[0];
+
+    if (!byDate[dateKey]) {
+      byDate[dateKey] = [];
+    }
+
+    byDate[dateKey].push(item);
+  });
+
+  const forecast = Object.keys(byDate).slice(0, 5).map(dateKey => {
+    const items = byDate[dateKey];
+
+    // Target hour = 12 PM
+    let closest = items[0];
+    let minDiff = Infinity;
+
+    items.forEach(item => {
+      const hour = new Date(item.dt * 1000).getHours();
+      const diff = Math.abs(12 - hour);
+
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = item;
+      }
+    });
+
+    const dateObj = new Date(closest.dt * 1000);
+
+    return {
+      day: dateObj.toLocaleDateString('en-US', { weekday: 'short' }),
+      date: dateObj.toISOString(),
+      time: dateObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      tempC: closest.main.temp,
+      condition: closest.weather[0].main,
+      icon: closest.weather[0].icon
+    };
+  });
+
+  return {
+    location: {
+      city: data.city.name,
+      country: data.city.country
+    },
+    forecast
+  };
+};
